@@ -1,0 +1,36 @@
+﻿@page "/"
+
+<PageTitle>Arcade Hub</PageTitle>
+
+<div class="container mt-4">
+    <h1 class="display-4 text-center">Welcome to the Arcade Hub</h1>
+    <hr class="mb-3" />
+
+    <div class="row align-items-start justify-content-between g-4 mt-0">
+        <div class="col-lg-7 d-flex flex-column justify-content-start text-center">
+            <h3 class="mb-3">Select a Game</h3>
+
+            <div class="d-flex flex-wrap justify-content-center gap-3">
+                <a href="/tictactoe" class="btn btn-primary btn-xl px-5 py-3">Tic-Tac-Toe</a>
+                <a href="/snake" class="btn btn-success btn-xl px-5 py-3">Snake</a>
+                <a href="/pacman" class="btn btn-warning btn-xl px-5 py-3 text-dark">Pacman</a>
+            </div>
+        </div>
+
+        <aside class="col-lg-5 ms-auto d-flex">
+            <div class="text-start bg-light p-4 rounded shadow-sm border w-100 align-self-stretch">
+                <h2 class="h4">About This Project</h2>
+                <p class="mb-3">
+                    This project is a collection of classic arcade games implemented using Blazor Web App.
+                    It includes a collection of popular games that is only growing in size.
+                </p>
+                <p class="mb-0">
+                    Built using C# and the Blazor Web App framework. It is meant to be an assembly of 3 previous projects
+                    I made in the past, along with more small ones yet to come, with improvements and optimizations,
+                    all gathered in one place. This home page serves as a central hub for users to access each game
+                    from the left-side menu and also provides a brief overview of the project.
+                </p>
+            </div>
+        </aside>
+    </div>
+</div>

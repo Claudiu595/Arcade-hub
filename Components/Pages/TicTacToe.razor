@@ -1,0 +1,234 @@
+@page "/tictactoe"
+@rendermode InteractiveServer
+@using System.Threading.Tasks
+
+<PageTitle>Tic-Tac-Toe</PageTitle>
+
+<div class="text-center">
+    <h2 class="display-5 mb-3">Tic-Tac-Toe</h2>
+
+    <div class="mb-4">
+        <button class="btn @(isVsBot ? "btn-success" : "btn-outline-success") btn-lg mx-2 px-4" @onclick="() => SetGameMode(true)">
+            Jucător vs Robot (PvC)
+        </button>
+        <button class="btn @(!isVsBot ? "btn-success" : "btn-outline-success") btn-lg mx-2 px-4" @onclick="() => SetGameMode(false)">
+            Jucător vs Jucător (PvP)
+        </button>
+    </div>
+    
+    @if (!string.IsNullOrEmpty(winner))
+    {
+        @if (winner == "Draw")
+        {
+            <h3 class="text-warning fs-2">It's a draw!</h3>
+        }
+        else
+        {
+            @if (isVsBot)
+            {
+                <h3 class="text-success fs-2">@(winner == "X" ? "You won!" : "You lost!")</h3>
+            }
+            else
+            {
+                <h3 class="text-success fs-2">Player @winner won!</h3>
+            }
+        }
+    }
+    else
+    {
+        <h3 class="fs-3 @(currentPlayer == "X" ? "text-primary" : "text-danger")">
+            @if (isVsBot)
+            {
+                @(currentPlayer == "X" ? "Your turn (X)" : "The robot is thinking...")
+            }
+            else
+            {
+                @($"Player {currentPlayer}'s turn")
+            }
+        </h3>
+    }
+
+    <div class="d-inline-block mt-2" style="background: #343a40; padding: 15px; border-radius: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.2);">
+        @for (int r = 0; r < 3; r++)
+        {
+            <div class="d-flex">
+                @for (int c = 0; c < 3; c++)
+                {
+                    int row = r;
+                    int col = c;
+                    <button class="btn btn-light m-2" style="width: 120px; height: 120px; font-size: 48px; font-weight: bold; color: @(board[row, col] == "X" ? "#007bff" : "#dc3545"); transition: all 0.2s;" @onclick="() => PlayerClick(row, col)" disabled="@(!string.IsNullOrEmpty(board[row, col]) || !string.IsNullOrEmpty(winner) || isBotThinking)">
+                        @board[row, col]
+                    </button>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="mt-4">
+        <button class="btn btn-primary btn-lg px-5 py-2" @onclick="ResetGame">
+            Reset Game
+        </button>
+    </div>
+</div>
+
+@code {
+    private string[,] board = new string[3, 3];
+    private string currentPlayer = "X"; 
+    private string winner = string.Empty;
+    private bool isVsBot = true; // Implicit pornește în modul contra robot
+    private bool isBotThinking = false;
+
+    private void SetGameMode(bool vsBot)
+    {
+        isVsBot = vsBot;
+        ResetGame();
+    }
+
+    private async Task PlayerClick(int row, int col)
+    {
+        if (!string.IsNullOrEmpty(board[row, col]) || !string.IsNullOrEmpty(winner) || isBotThinking) return;
+
+        // Jucătorul curent mută (X sau O în modul PvP, sau mereu X în modul PvC)
+        board[row, col] = currentPlayer;
+
+        if (CheckWinner(currentPlayer))
+        {
+            winner = currentPlayer;
+            return;
+        }
+        else if (IsBoardFull())
+        {
+            winner = "Draw";
+            return;
+        }
+
+        if (isVsBot)
+        {
+            // Modul Jucător vs Robot
+            currentPlayer = "O";
+            isBotThinking = true;
+            StateHasChanged();
+
+            await Task.Delay(400); // Pauză non-blocantă pentru ca meniul să funcționeze în continuare
+            BotMove();
+        }
+        else
+        {
+            // Modul Jucător vs Jucător (Schimbă rândul alternativ)
+            currentPlayer = currentPlayer == "X" ? "O" : "X";
+            StateHasChanged();
+        }
+    }
+
+    private void BotMove()
+    {
+        if (!string.IsNullOrEmpty(winner)) 
+        {
+            isBotThinking = false;
+            return;
+        }
+
+        // 1. ATAC: Robotul verifică dacă poate câștiga direct
+        if (TryFindWinningMove("O", out int br, out int bc))
+        {
+            board[br, bc] = "O";
+        }
+        // 2. APĂRARE: Robotul te blochează dacă ai 2 piese aliniate
+        else if (TryFindWinningMove("X", out int pr, out int pc))
+        {
+            board[pr, pc] = "O";
+        }
+        // 3. RANDOM: Pune piesa pe un loc gol aleatoriu
+        else
+        {
+            var emptyCells = new List<(int R, int C)>();
+            for (int r = 0; r < 3; r++)
+            {
+                for (int c = 0; c < 3; c++)
+                {
+                    if (string.IsNullOrEmpty(board[r, c])) emptyCells.Add((r, c));
+                }
+            }
+
+            if (emptyCells.Count > 0)
+            {
+                var rand = new Random();
+                var choice = emptyCells[rand.Next(emptyCells.Count)];
+                board[choice.R, choice.C] = "O";
+            }
+        }
+
+        if (CheckWinner("O"))
+        {
+            winner = "O";
+        }
+        else if (IsBoardFull())
+        {
+            winner = "Draw";
+        }
+        else
+        {
+            currentPlayer = "X"; 
+        }
+
+        isBotThinking = false;
+        StateHasChanged();
+    }
+
+    private bool TryFindWinningMove(string player, out int foundRow, out int foundCol)
+    {
+        foundRow = -1;
+        foundCol = -1;
+
+        for (int r = 0; r < 3; r++)
+        {
+            for (int c = 0; c < 3; c++)
+            {
+                if (string.IsNullOrEmpty(board[r, c]))
+                {
+                    board[r, c] = player;
+                    bool isWin = CheckWinner(player);
+                    board[r, c] = string.Empty; 
+
+                    if (isWin)
+                    {
+                        foundRow = r;
+                        foundCol = c;
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private bool CheckWinner(string player)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            if (board[i, 0] == player && board[i, 1] == player && board[i, 2] == player) return true;
+            if (board[0, i] == player && board[1, i] == player && board[2, i] == player) return true;
+        }
+        if (board[0, 0] == player && board[1, 1] == player && board[2, 2] == player) return true;
+        if (board[0, 2] == player && board[1, 1] == player && board[2, 0] == player) return true;
+
+        return false;
+    }
+
+    private bool IsBoardFull()
+    {
+        foreach (var cell in board)
+        {
+            if (string.IsNullOrEmpty(cell)) return false;
+        }
+        return true;
+    }
+
+    private void ResetGame()
+    {
+        board = new string[3, 3];
+        currentPlayer = "X";
+        winner = string.Empty;
+        isBotThinking = false;
+    }
+}

@@ -1,0 +1,159 @@
+@page "/snake"
+@rendermode InteractiveServer
+@using Site_jocuri.Models.Snake
+@using System.Threading
+@implements IDisposable
+
+<PageTitle>Snake</PageTitle>
+
+<style>
+    .game-grid {
+        display: inline-grid;
+        /* Folosim o dimensiune fixă pentru fiecare celulă pentru a forma pătrate */
+        grid-template-columns: repeat(@engine.Width, 32px);
+        grid-template-rows: repeat(@engine.Height, 32px);
+        background: #eee;
+        border: 4px solid #333;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        padding: 5px;
+    }
+
+    .game-cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: monospace;
+        font-weight: bold;
+        /* Dimensiunea fontului pentru cercuri și pătrate */
+        font-size: 28px; 
+    }
+</style>
+
+<div class="text-center" tabindex="0" @onkeydown="HandleKeyDown" style="outline: none;" autofocus>
+    <h2 class="display-5">Snake Game</h2>
+
+    @if (!hasStarted)
+    {
+        <div class="mt-5">
+            <button class="btn btn-success btn-lg px-5 py-3" @onclick="StartGame">Start Game</button>
+        </div>
+    }
+    else
+    {
+        <h4 class="text-success fs-3 mb-3">Score: @engine.Score</h4>
+
+        <div class="mt-2 game-grid">
+            @for (int y = 0; y < engine.Height; y++)
+            {
+                @for (int x = 0; x < engine.Width; x++)
+                {
+                    <div class="game-cell">
+                        @if (engine.Snake.Head == (x, y))
+                        {
+                            <span style="color: #007bff;">●</span>
+                        }
+                        else if (engine.Snake.TailHashSet.Contains($"{x},{y}"))
+                        {
+                            <span style="color: #6c757d;">●</span>
+                        }
+                        else if (engine.Food == (x, y))
+                        {
+                            <span style="color: #dc3545;">●</span>
+                        }
+                        else if (x == 0 || y == 0 || x == engine.Width - 1 || y == engine.Height - 1)
+                        {
+                            <span style="color: #343a40;">■</span>
+                        }
+                        else
+                        {
+                            <span style="color: #ccc; font-size: 16px;">.</span>
+                        }
+                    </div>
+                }
+            }
+        </div>
+
+        @if (engine.IsGameOver)
+        {
+            <div class="mt-4">
+                <h3 class="text-danger fs-2">Game Over! @engine.GameOverMessage</h3>
+                <button class="btn btn-success btn-lg px-5 py-2 mt-2" @onclick="RestartGame">Restart Game</button>
+            </div>
+        }
+    }
+
+    <p class="text-muted mt-4 fs-5">Click inside the area and use <strong>W, A, S, D</strong> or <strong>Arrow Keys</strong> to move.</p>
+</div>
+
+@code {
+    private SnakeEngine engine = new SnakeEngine();
+    private bool isRunning = false;
+    private bool hasStarted = false;
+    private Task? gameLoopTask;
+
+    private void StartGame()
+    {
+        if (isRunning && gameLoopTask is { IsCompleted: false })
+        {
+            return;
+        }
+
+        hasStarted = true;
+        engine.StartGame();
+        isRunning = true;
+        gameLoopTask = Task.Run(async () => await GameLoop());
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (!hasStarted || !isRunning)
+        {
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case "w":
+            case "ArrowUp":
+                engine.Snake.SetDirection(0, -1);
+                break;
+            case "s":
+            case "ArrowDown":
+                engine.Snake.SetDirection(0, 1);
+                break;
+            case "a":
+            case "ArrowLeft":
+                engine.Snake.SetDirection(-1, 0);
+                break;
+            case "d":
+            case "ArrowRight":
+                engine.Snake.SetDirection(1, 0);
+                break;
+        }
+    }
+
+    private async Task GameLoop()
+    {
+        while (isRunning)
+        {
+            if (!engine.IsGameOver)
+            {
+                engine.Update();
+                await InvokeAsync(StateHasChanged);
+            }
+            await Task.Delay(150);
+        }
+    }
+
+    private void RestartGame()
+    {
+        engine.StartGame();
+        isRunning = true;
+        gameLoopTask = Task.Run(async () => await GameLoop());
+    }
+
+    public void Dispose()
+    {
+        isRunning = false;
+    }
+}

@@ -1,0 +1,195 @@
+@page "/pacman"
+@rendermode InteractiveServer
+@using Site_jocuri.Models.Pacman
+@using System.Threading
+@implements IDisposable
+
+<PageTitle>Pacman Escape </PageTitle>
+
+<style>
+    .pacman-grid {
+        display: inline-grid;
+        /* Folosim o dimensiune fixă pentru fiecare celulă pentru a forma pătrate */
+        grid-template-columns: repeat(@engine.Map.Width, 28px);
+        grid-template-rows: repeat(@engine.Map.Height, 28px);
+        background: #222;
+        color: #fff;
+        border: 4px solid #333;
+        border-radius: 8px;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        padding: 5px;
+    }
+
+    .pacman-cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: monospace;
+        font-weight: bold;
+        /* Dimensiunea fontului pentru cercuri, triunghiuri si patrate */
+        font-size: 24px; 
+    }
+</style>
+
+<div class="text-center" tabindex="0" @onkeydown="HandleKeyDown" style="outline: none;" autofocus>
+    <h2 class="display-5">Pacman Escape</h2>
+
+    @if (!hasStarted)
+    {
+        <div class="mt-5">
+            <button class="btn btn-warning btn-lg px-5 py-3 text-dark" @onclick="StartGame">Start Game</button>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex justify-content-center gap-4 my-3">
+            <span class="badge bg-danger fs-4 px-4 py-2">HP: @engine.Hero.HP</span>
+            <span class="badge bg-primary fs-4 px-4 py-2">Points: @engine.Hero.Points / 30</span>
+            <span class="badge bg-warning text-dark fs-4 px-4 py-2">Stamina: @engine.Hero.Stamina</span>
+        </div>
+
+        @if (engine.Hero.HP <= 0)
+        {
+            <h3 class="text-danger fs-2 mt-4">Game Over! Final Score: @engine.Hero.Points</h3>
+            <button class="btn btn-success btn-lg px-5 mt-2" @onclick="RestartGame">Restart Game</button>
+        }
+        else if (engine.Hero.Points >= 30)
+        {
+            <h3 class="text-success fs-2 mt-4">Congratulations! You Won with 30 Points!</h3>
+            <button class="btn btn-success btn-lg px-5 mt-2" @onclick="RestartGame">Play Again</button>
+        }
+        else
+        {
+            <div class="mt-2 pacman-grid">
+                @for (int y = 0; y < engine.Map.Height; y++)
+                {
+                    @for (int x = 0; x < engine.Map.Width; x++)
+                    {
+                        <div class="pacman-cell">
+                            @{
+                                var entity = engine.Map.Get(x, y);
+                                if (entity != null)
+                                {
+                                    <span style="color: @GetColor(entity.Symbol);">@GetVisualShape(entity.Symbol)</span>
+                                }
+                                else
+                                {
+                                    <span style="color: #444; font-size: 14px;">.</span>
+                                }
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        }
+    }
+    <p class="text-muted mt-4 fs-5">Click inside the area and use <strong>W, A, S, D</strong> or <strong>Arrow Keys</strong> to move.</p>
+</div>
+
+@code {
+    private PacmanEngine engine = new PacmanEngine();
+    private bool isRunning = false;
+    private bool hasStarted = false;
+    private Task? enemyLoopTask;
+
+    private void StartGame()
+    {
+        if (isRunning && enemyLoopTask is { IsCompleted: false })
+        {
+            return;
+        }
+
+        hasStarted = true;
+        engine = new PacmanEngine();
+        isRunning = true;
+        enemyLoopTask = Task.Run(async () => await EnemyLoop());
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (!hasStarted || !isRunning)
+        {
+            return;
+        }
+
+        int dx = 0, dy = 0;
+
+        switch (e.Key)
+        {
+            case "w":
+            case "ArrowUp":
+                dy = -1;
+                break;
+            case "s":
+            case "ArrowDown":
+                dy = 1;
+                break;
+            case "a":
+            case "ArrowLeft":
+                dx = -1;
+                break;
+            case "d":
+            case "ArrowRight":
+                dx = 1;
+                break;
+            default:
+                return;
+        }
+
+        if (dx != 0 || dy != 0)
+        {
+            engine.MovePlayer(dx, dy);
+
+            if (engine.Hero.Points >= 30)
+            {
+                isRunning = false;
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task EnemyLoop()
+    {
+        while (isRunning)
+        {
+            if (engine.Hero.HP > 0 && engine.Hero.Points < 30)
+            {
+                engine.UpdateEnemiesAndEnvironment();
+                await InvokeAsync(StateHasChanged);
+            }
+            await Task.Delay(300);
+        }
+    }
+
+    private void RestartGame()
+    {
+        engine = new PacmanEngine();
+        hasStarted = true;
+        isRunning = true;
+        enemyLoopTask = Task.Run(async () => await EnemyLoop());
+    }
+
+    private string GetVisualShape(string symbol) => symbol switch
+    {
+        "@" => "●",
+        "E" => "▲",
+        "$" => "●",
+        "#" => "■",
+        _ => symbol
+    };
+
+    private string GetColor(string symbol) => symbol switch
+    {
+        "@" => "#ffc107",
+        "E" => "#dc3545",
+        "$" => "#28a745",
+        "#" => "#6c757d",
+        _ => "white"
+    };
+
+    public void Dispose()
+    {
+        isRunning = false;
+    }
+}
